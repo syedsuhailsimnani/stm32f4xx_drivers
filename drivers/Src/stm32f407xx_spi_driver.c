@@ -581,7 +581,32 @@ static void	spi_txe_interrupt_handle(SPI_Handle_t *pSPIHandle)
 }
 static void	spi_rxne_interrupt_handle(SPI_Handle_t *pSPIHandle)
 {
+	//Check the DFF bit if the Data frame format is set to 16 bits then
+	if (pSPIHandle->pSPIx->CR1 & (1<< SPI_CR1_DFF))
+	{
+		*((uint16_t*)pSPIHandle->pRxBuffer)= (uint16_t)pSPIHandle->pSPIx->DR;
+		pSPIHandle->RxLen -=2;
+		pSPIHandle->pRxBuffer--;
+		pSPIHandle->pRxBuffer--;
+	}
+	else
+	{
+		//Here the first condition is not met so create a receiver for 8 bits.
+		*(pSPIHandle->pRxBuffer)= (uint8_t) pSPIHandle->pSPIx->DR;
+		pSPIHandle->RxLen -=1;
+		pSPIHandle->pRxBuffer--;
+	}
 
+	if(!pSPIHandle->RxLen)
+	{
+		//Reception is complete
+		//turning off the RXNEIE Interrupt
+		pSPIHandle->pSPIx->CR2 &= ~(1<<SPI_CR2_RXNEIE);
+		pSPIHandle->pRxBuffer =NULL;
+		pSPIHandle->RxLen=0;
+		pSPIHandle->RxState=SPI_Ready;
+		SPI_ApplicationEventCallback(pSPIHandle, SPI_EVENT_RX_CMPLT);
+	}
 }
 static void	spi_ovr_err_interrupt_handle(SPI_Handle_t *pSPIHandle)
 {
